@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rain + Breeze Wall Simulator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111316;
+      --panel: rgba(22, 26, 30, 0.92);
+      --line: rgba(255, 255, 255, 0.14);
+      --text: #eef3f5;
+      --muted: #aeb9bf;
+      --accent: #67d2c0;
+      --accent-2: #8fb4ff;
+      --model: #ffb86b;
+      --shadow: 0 22px 70px rgba(0, 0, 0, 0.38);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      grid-template-columns: minmax(280px, 340px) 1fr;
+      background:
+        linear-gradient(120deg, rgba(103, 210, 192, 0.08), transparent 32%),
+        linear-gradient(260deg, rgba(143, 180, 255, 0.10), transparent 38%),
+        #111316;
+    }
+
+    aside {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 22px;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    main { position: relative; min-width: 0; min-height: 0; }
+    #viewport { width: 100%; height: 100%; }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    h1 {
+      margin: 0;
+      color: var(--text);
+      font-size: 1.65rem;
+      font-weight: 760;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 10px 0 22px;
+      color: var(--muted);
+      font-size: 0.94rem;
+      line-height: 1.45;
+    }
+
+    .panel-section {
+      padding: 16px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .panel-section:first-of-type { border-top: 0; padding-top: 0; }
+    .upload { display: grid; gap: 10px; }
+
+    input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    .upload-button,
+    button {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid rgba(103, 210, 192, 0.45);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(103, 210, 192, 0.18), rgba(103, 210, 192, 0.08));
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+      letter-spacing: 0;
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .upload-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 0 14px;
+    }
+
+    .upload-button:hover,
+    button:hover {
+      border-color: var(--accent);
+      background: linear-gradient(180deg, rgba(103, 210, 192, 0.26), rgba(103, 210, 192, 0.12));
+      transform: translateY(-1px);
+    }
+
+    .file-name {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .control { display: grid; gap: 8px; margin-bottom: 16px; }
+    .control:last-child { margin-bottom: 0; }
+
+    .control-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 14px;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 690;
+    }
+
+    .value {
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      font-size: 0.84rem;
+      font-weight: 760;
+    }
+
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+    .instructions {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .instructions li { margin: 8px 0; }
+
+    .status-bar {
+      position: absolute;
+      left: 22px;
+      right: 22px;
+      bottom: 18px;
+      z-index: 3;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 11px 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(17, 19, 22, 0.70);
+      color: var(--muted);
+      font-size: 0.84rem;
+      backdrop-filter: blur(14px);
+      pointer-events: none;
+    }
+
+    .status-bar strong { color: var(--text); font-weight: 760; }
+    .metric { white-space: nowrap; }
+
+    .corner-label {
+      position: absolute;
+      top: 20px;
+      right: 22px;
+      z-index: 3;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(17, 19, 22, 0.68);
+      color: var(--muted);
+      font-size: 0.82rem;
+      backdrop-filter: blur(14px);
+      pointer-events: none;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .legend span { display: inline-flex; align-items: center; gap: 7px; }
+    .swatch { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+    .swatch.wind { background: var(--accent-2); }
+    .swatch.model { background: var(--model); }
+    .swatch.grid { background: #6d7780; }
+
+    @media (max-width: 800px) {
+      body { overflow: auto; }
+      #app {
+        position: relative;
+        min-height: 100vh;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(520px, 70vh);
+      }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      .status-bar { left: 12px; right: 12px; bottom: 12px; }
+      .corner-label { top: 12px; right: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside aria-label="Simulation controls">
+      <header>
+        <h1>Rain + Breeze Wall Simulator</h1>
+        <p class="subtitle">Browser-based rain and wind testing for architectural breeze wall OBJ geometries.</p>
+      </header>
+
+      <section class="panel-section upload" aria-label="Upload model">
+        <label class="upload-button" for="objUpload">Upload OBJ</label>
+        <input id="objUpload" type="file" accept=".obj,model/obj,text/plain" />
+        <div id="fileName" class="file-name">No model uploaded. Showing reference wall.</div>
+      </section>
+
+      <section class="panel-section" aria-label="Simulation sliders">
+        <label class="control">
+          <span class="control-row"><span>Rain amount</span><span id="rainAmountValue" class="value"></span></span>
+          <input id="rainAmount" type="range" min="200" max="5000" step="100" value="1800" />
+        </label>
+        <label class="control">
+          <span class="control-row"><span>Rain speed</span><span id="rainSpeedValue" class="value"></span></span>
+          <input id="rainSpeed" type="range" min="0.2" max="3.2" step="0.1" value="1.4" />
+        </label>
+        <label class="control">
+          <span class="control-row"><span>Wind X</span><span id="windXValue" class="value"></span></span>
+          <input id="windX" type="range" min="-2.5" max="2.5" step="0.1" value="0.6" />
+        </label>
+        <label class="control">
+          <span class="control-row"><span>Wind Z</span><span id="windZValue" class="value"></span></span>
+          <input id="windZ" type="range" min="-2.5" max="2.5" step="0.1" value="-0.4" />
+        </label>
+        <label class="control">
+          <span class="control-row"><span>Model scale</span><span id="modelScaleValue" class="value"></span></span>
+          <input id="modelScale" type="range" min="0.2" max="5" step="0.1" value="1" />
+        </label>
+        <button id="resetCamera" type="button">Reset camera</button>
+      </section>
+
+      <section class="panel-section" aria-label="Instructions">
+        <ol class="instructions">
+          <li>Export geometry as OBJ from your modeling software.</li>
+          <li>Upload the OBJ file with the button above.</li>
+          <li>Adjust rain amount, rain speed, and wind direction.</li>
+          <li>Orbit with the mouse to inspect rain behavior around the wall.</li>
+        </ol>
+      </section>
+
+      <section class="panel-section legend" aria-label="Scene legend">
+        <span><i class="swatch"></i>Rain particles</span>
+        <span><i class="swatch wind"></i>Wind vector</span>
+        <span><i class="swatch model"></i>OBJ model</span>
+        <span><i class="swatch grid"></i>Ground grid</span>
+      </section>
+    </aside>
+
+    <main>
+      <div class="corner-label">Static Three.js prototype</div>
+      <div id="viewport"></div>
+      <div class="status-bar">
+        <span class="metric"><strong id="dropCount">0</strong> active rain drops</span>
+        <span class="metric">Wind vector <strong id="windReadout">0, 0</strong></span>
+        <span class="metric">Mouse: orbit, pan, zoom</span>
+      </div>
+    </main>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+
+    const viewport = document.getElementById("viewport");
+    const uploadInput = document.getElementById("objUpload");
+    const fileName = document.getElementById("fileName");
+    const rainAmount = document.getElementById("rainAmount");
+    const rainSpeed = document.getElementById("rainSpeed");
+    const windX = document.getElementById("windX");
+    const windZ = document.getElementById("windZ");
+    const modelScale = document.getElementById("modelScale");
+    const resetCamera = document.getElementById("resetCamera");
+    const dropCount = document.getElementById("dropCount");
+    const windReadout = document.getElementById("windReadout");
+
+    const valueLabels = {
+      rainAmount: document.getElementById("rainAmountValue"),
+      rainSpeed: document.getElementById("rainSpeedValue"),
+      windX: document.getElementById("windXValue"),
+      windZ: document.getElementById("windZValue"),
+      modelScale: document.getElementById("modelScaleValue")
+    };
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111316);
+    scene.fog = new THREE.Fog(0x111316, 14, 42);
+
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 120);
+    camera.position.set(7, 5.2, 8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(1, 1);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 1.5, 0);
+
+    scene.add(new THREE.HemisphereLight(0xddefff, 0x22262b, 2.4));
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.8);
+    keyLight.position.set(4, 8, 6);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x8fb4ff, 1.2);
+    fillLight.position.set(-7, 4, -5);
+    scene.add(fillLight);
+
+    const grid = new THREE.GridHelper(18, 36, 0x4c5d66, 0x293136);
+    grid.position.y = -0.02;
+    scene.add(grid);
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(18, 18),
+      new THREE.MeshStandardMaterial({ color: 0x171b1f, roughness: 0.92, metalness: 0.02 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const modelRoot = new THREE.Group();
+    scene.add(modelRoot);
+
+    const windArrow = new THREE.ArrowHelper(
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(-4.2, 2.7, 3.8),
+      2.4,
+      0x8fb4ff,
+      0.45,
+      0.25
+    );
+    scene.add(windArrow);
+
+    const rainMaterial = new THREE.PointsMaterial({
+      color: 0x8ee8ff,
+      size: 0.055,
+      transparent: true,
+      opacity: 0.78,
+      depthWrite: false
+    });
+    const maxDrops = Number(rainAmount.max);
+    const rainGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(maxDrops * 3);
+    const fallOffsets = new Float32Array(maxDrops);
+    const activeRain = new THREE.Points(rainGeometry, rainMaterial);
+    scene.add(activeRain);
+
+    function randomDrop(index) {
+      const i = index * 3;
+      positions[i] = THREE.MathUtils.randFloatSpread(11);
+      positions[i + 1] = THREE.MathUtils.randFloat(2.2, 9.5);
+      positions[i + 2] = THREE.MathUtils.randFloatSpread(11);
+      fallOffsets[index] = THREE.MathUtils.randFloat(0.7, 1.4);
+    }
+
+    for (let i = 0; i < maxDrops; i += 1) randomDrop(i);
+    rainGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    rainGeometry.setDrawRange(0, Number(rainAmount.value));
+
+    function clearModel() {
+      while (modelRoot.children.length) {
+        const child = modelRoot.children.pop();
+        child.traverse((node) => {
+          if (node.geometry) node.geometry.dispose();
+          if (node.material) {
+            if (Array.isArray(node.material)) node.material.forEach((material) => material.dispose());
+            else node.material.dispose();
+          }
+        });
+      }
+    }
+
+    function centerAndStyleModel(object) {
+      const box = new THREE.Box3().setFromObject(object);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const largestSide = Math.max(size.x, size.y, size.z) || 1;
+      object.position.sub(center);
+      object.scale.setScalar(3.4 / largestSide);
+
+      object.traverse((node) => {
+        if (node.isMesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+          node.material = new THREE.MeshStandardMaterial({
+            color: 0xffb86b,
+            roughness: 0.62,
+            metalness: 0.05,
+            side: THREE.DoubleSide
+          });
+        }
+      });
+
+      modelRoot.add(object);
+      applyModelScale();
+    }
+
+    function createReferenceWall() {
+      clearModel();
+      const wall = new THREE.Group();
+      const material = new THREE.MeshStandardMaterial({ color: 0xffb86b, roughness: 0.65, metalness: 0.04 });
+
+      for (let x = -2; x <= 2; x += 1) {
+        for (let y = 0; y < 4; y += 1) {
+          if ((x + y) % 2 === 0) {
+            const block = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.52, 0.34), material.clone());
+            block.position.set(x * 0.82, y * 0.62 + 0.35, 0);
+            block.castShadow = true;
+            block.receiveShadow = true;
+            wall.add(block);
+          }
+        }
+      }
+
+      centerAndStyleModel(wall);
+    }
+
+    function applyModelScale() {
+      modelRoot.scale.setScalar(Number(modelScale.value));
+    }
+
+    function updateLabels() {
+      valueLabels.rainAmount.textContent = Number(rainAmount.value).toLocaleString();
+      valueLabels.rainSpeed.textContent = `${Number(rainSpeed.value).toFixed(1)}x`;
+      valueLabels.windX.textContent = Number(windX.value).toFixed(1);
+      valueLabels.windZ.textContent = Number(windZ.value).toFixed(1);
+      valueLabels.modelScale.textContent = `${Number(modelScale.value).toFixed(1)}x`;
+      dropCount.textContent = Number(rainAmount.value).toLocaleString();
+      windReadout.textContent = `${Number(windX.value).toFixed(1)}, ${Number(windZ.value).toFixed(1)}`;
+
+      const direction = new THREE.Vector3(Number(windX.value), 0, Number(windZ.value));
+      if (direction.lengthSq() < 0.01) direction.set(1, 0, 0);
+      windArrow.setDirection(direction.normalize());
+      windArrow.setLength(1.6 + Math.min(1.8, Math.abs(Number(windX.value)) + Math.abs(Number(windZ.value)) * 0.5));
+    }
+
+    function updateRainAmount() {
+      rainGeometry.setDrawRange(0, Number(rainAmount.value));
+      updateLabels();
+    }
+
+    function resetCameraView() {
+      camera.position.set(7, 5.2, 8);
+      controls.target.set(0, 1.5, 0);
+      controls.update();
+    }
+
+    uploadInput.addEventListener("change", () => {
+      const file = uploadInput.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        try {
+          const loader = new OBJLoader();
+          const object = loader.parse(String(reader.result));
+          clearModel();
+          centerAndStyleModel(object);
+          fileName.textContent = file.name;
+        } catch (error) {
+          console.error(error);
+          fileName.textContent = "Could not read that OBJ file.";
+          createReferenceWall();
+        }
+      });
+      reader.readAsText(file);
+    });
+
+    rainAmount.addEventListener("input", updateRainAmount);
+    rainSpeed.addEventListener("input", updateLabels);
+    windX.addEventListener("input", updateLabels);
+    windZ.addEventListener("input", updateLabels);
+    modelScale.addEventListener("input", () => {
+      applyModelScale();
+      updateLabels();
+    });
+    resetCamera.addEventListener("click", resetCameraView);
+
+    function resize() {
+      const rect = viewport.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const height = Math.max(1, rect.height);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    }
+
+    window.addEventListener("resize", resize);
+
+    let previousTime = 0;
+    function animate(time = 0) {
+      const delta = Math.min(0.05, (time - previousTime) / 1000 || 0.016);
+      previousTime = time;
+      const activeDrops = Number(rainAmount.value);
+      const speed = Number(rainSpeed.value);
+      const driftX = Number(windX.value);
+      const driftZ = Number(windZ.value);
+
+      for (let i = 0; i < activeDrops; i += 1) {
+        const p = i * 3;
+        positions[p] += driftX * delta * 0.55;
+        positions[p + 1] -= speed * delta * 4.2 * fallOffsets[i];
+        positions[p + 2] += driftZ * delta * 0.55;
+
+        if (positions[p + 1] < 0 || Math.abs(positions[p]) > 6.4 || Math.abs(positions[p + 2]) > 6.4) {
+          positions[p] = THREE.MathUtils.randFloatSpread(11);
+          positions[p + 1] = THREE.MathUtils.randFloat(7.2, 10);
+          positions[p + 2] = THREE.MathUtils.randFloatSpread(11);
+        }
+      }
+
+      rainGeometry.attributes.position.needsUpdate = true;
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    createReferenceWall();
+    updateLabels();
+    updateRainAmount();
+    resize();
+    animate();
+  </script>
+</body>
+</html>
